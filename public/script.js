@@ -4,7 +4,9 @@ const myPeer = new Peer()
 const myAudio = document.createElement('audio')
 myAudio.muted = true
 const peers = {}
+const ROOM_ID = "MAN2"
 var myId = ""
+$("#chats").show()
 var Message = function (arg) {
 	this.text = arg.text, this.message_side = arg.message_side, this.message_name = arg.message_name;
 	this.draw = function (_this) {
@@ -54,30 +56,31 @@ navigator.mediaDevices.getUserMedia({
   addAudioStream(myAudio, stream)
 
   myPeer.on('call', call => {
-    call.answer(stream)
-    const audio = document.createElement('audio')
-    call.on('stream', userAudioStream => {
-      addAudioStream(audio, userAudioStream)
-    })
+	call.answer(stream)
+	const audio = document.createElement('audio')
+	call.on('stream', userAudioStream => {
+	  addAudioStream(audio, userAudioStream)
+	})
   })
 
-  socket.on('user-connected', userId => {
-    connectToNewUser(userId, stream)
+  socket.on('user-connected', (userId, name) => {
+	connectToNewUser(userId, stream, name)
   })
 }).catch(function(err) {
-  alert("Izinkan Akses Mikrofon untuk melanjutkan")
+  alert(err)
 })
 
-socket.on('user-disconnected', userId => {
+socket.on('user-disconnected', (userId, name) => {
   if (peers[userId]){
-	  sendMessage('Keluar ruangan', "left", userId);
+	  sendMessage('Keluar ruangan', "left", name);
 	  peers[userId].close()
   }
 })
 
 myPeer.on('open', id => {
-	myId = id;
-  sendMessage('Memasuki ruangan', "right", id);
+  myId = id;
+  socket.emit('set-name', ROOM_ID, id, MY_NAME)
+  sendMessage('Memasuki ruangan', "right", MY_NAME);
   socket.emit('join-room', ROOM_ID, id)
 })
 
@@ -85,15 +88,15 @@ socket.on('chatSend', (nama, pesan) => {
   sendMessage(pesan, "left", nama);
 })
 
-function connectToNewUser(userId, stream) {
-  sendMessage('Memasuki ruangan', "left", userId);
+function connectToNewUser(userId, stream, name) {
+  sendMessage('Memasuki ruangan', "left", name);
   const call = myPeer.call(userId, stream)
   const audio = document.createElement('audio')
   call.on('stream', userAudioStream => {
-    addAudioStream(audio, userAudioStream)
+	addAudioStream(audio, userAudioStream)
   })
   call.on('close', () => {
-    audio.remove()
+	audio.remove()
   })
 
   peers[userId] = call
@@ -102,26 +105,22 @@ function connectToNewUser(userId, stream) {
 function addAudioStream(audio, stream) {
   audio.srcObject = stream
   audio.addEventListener('loadedmetadata', () => {
-    audio.play()
+	audio.play()
   })
   videoGrid.append(audio)
 }
 
 (function () {
-    $(function () {
-        $('.send_message').click(function (e) {
-			socket.emit('send-chat', ROOM_ID, myId, getMessageText())
-            return sendMessage(getMessageText(), "right", myId);
-        });
-        $('.message_input').keyup(function (e) {
-            if (e.which === 13) {
-				socket.emit('send-chat', ROOM_ID, myId, getMessageText())
-                return sendMessage(getMessageText(), "right", myId);
-            }
-        });
-    });
+	$(function () {
+		$('.send_message').click(function (e) {
+			socket.emit('send-chat', ROOM_ID, MY_NAME, getMessageText())
+			return sendMessage(getMessageText(), "right", MY_NAME);
+		});
+		$('.message_input').keyup(function (e) {
+			if (e.which === 13) {
+				socket.emit('send-chat', ROOM_ID, MY_NAME, getMessageText())
+				return sendMessage(getMessageText(), "right", MY_NAME);
+			}
+		});
+	});
 }.call(this)); 
-
-$("#nama").on('change keydown paste input', function(){
-      //console.log($(this).val())
-});
